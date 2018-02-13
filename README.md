@@ -1,1 +1,3 @@
-# APES_Project1
+Project 1
+
+Contributors: Vipraja Patil and Nikhil Divekar
