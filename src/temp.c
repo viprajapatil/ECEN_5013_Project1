@@ -114,7 +114,7 @@ int write_config_reg(FILE *fd, uint16_t reg)
 
 }
  
-uint8_t read_config_reg()
+uint8_t read_config_reg(FILE *fd)
 {
 	uint16_t config_value;
 	uint8_t buff[1] = {0};
