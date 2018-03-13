@@ -1,8 +1,37 @@
-#include "temp.h"
+//#include "temp.h"
 
-void write_pointer_reg(FILE *fd, uint8_t reg)
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdint.h>
+#include <linux/i2c-dev.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
+enum{
+Celsius,
+Kelvin,
+Fahrenheit
+}Temp_unit;
+
+enum{
+	Success,
+	Fail
+}return_value;
+
+#define Addr_temp_reg    0x00
+#define Addr_config_reg  0x01
+#define Addr_tlow_reg    0x02
+#define Addr_thigh_reg 0x03
+
+
+void write_pointer_reg(int fd, uint8_t reg)
 {
-	int ret = write(fd, reg, sizeof(reg));
+	int ret = write(fd, &reg, sizeof(reg));
 	if (ret < 0)
 	{
 		perror("Write to pointer reg failed");
@@ -36,23 +65,29 @@ uint16_t read_thigh_reg(FILE *fd)
 	return thigh_value;
 }
 
-float read_temp_reg(FILE *fd, int unit)
+float read_temp_reg(int fd, int unit)
 {
-	float temp;
-	uint16_t buff;
+	
+	int temp;
+	float final_temp;
+  	uint8_t msbval, lsbval;
+	uint8_t buff[2];
 	write_pointer_reg(fd, Addr_temp_reg);
-	int ret = read(fd, buff, sizeof(buff));
-	if (ret < 0)
+	int ret = read(fd, &buff, sizeof(buff));
+	if (ret != 2)
 		perror("Read temp reg failed");
 	
-	buff = buff>>4;
-	int msb_bit;
-	if (msb & buff)
-		msb_bit = 1;
-	else msb_bit = 0;
-	
-	temp = buff;
+	//buff = buff>>4;
+	msbval = buff[0];
+	lsbval = buff[1];
 	int msb = 80;
+	int msb_bit = 0;
+	/*if (msb & buff)
+		msb_bit = 1;
+	else msb_bit = 0;*/
+	
+	temp = ((msbval << 8) | lsbval) >> 4;
+	printf("%d\n", temp);
 	
 	if (!msb_bit)
 	{	temp = temp*0.0625;
@@ -102,8 +137,10 @@ float read_temp_reg(FILE *fd, int unit)
 		}
 	}*/
 	
-	
+
+
 }
+
 
 int write_config_reg(FILE *fd, uint16_t reg)
 {
@@ -128,28 +165,31 @@ uint8_t read_config_reg(FILE *fd)
 	return config_value;
 }
 
-void temp_init()
+int temp_init()
 {
+	char i2c_name[20] = "/dev/i2c-2";
 	int file;
-	char filename[20];
-	snprintf(filename, 19, "/dev/i2c-2");
-	file = open(filename, O_RDWR);
+	file = open(i2c_name, O_RDWR);
 	if (file < 0) 
 	{
 		perror("Error in file opening");
 		exit(-1);
 	}
-	int addr = 0x40;
+	int addr = 0x48;
 
 	if (ioctl(file, I2C_SLAVE, addr) < 0) 
 	{
-		perror("Ioctl error");
+		perror("Can't access the bus");
 		exit(-1);
-	}	
+	}
+	return file;	
 }
 
-
-
-
-
-
+void main()
+{
+	int fd;
+	float value;
+	fd = temp_init();
+	value = read_temp_reg(fd,Celsius);
+	printf("%f", value);
+}
