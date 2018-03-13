@@ -1,4 +1,3 @@
-//#include "temp.h"
 
 #include <errno.h>
 #include <string.h>
@@ -38,7 +37,7 @@ void write_pointer_reg(int fd, uint8_t reg)
 	}	
 }
 
-uint16_t read_tlow_reg(FILE *fd)
+uint16_t read_tlow_reg(int fd)
 {
 	uint16_t tlow_value;
 	uint8_t buff[1] = {0};
@@ -52,7 +51,7 @@ uint16_t read_tlow_reg(FILE *fd)
 	return tlow_value;
 }
 
-uint16_t read_thigh_reg(FILE *fd)
+uint16_t read_thigh_reg(int fd)
 {
 	uint16_t thigh_value;
 	uint8_t buff[1] = {0};
@@ -76,18 +75,18 @@ float read_temp_reg(int fd, int unit)
 	int ret = read(fd, &buff, sizeof(buff));
 	if (ret != 2)
 		perror("Read temp reg failed");
-	
-	//buff = buff>>4;
+
 	msbval = buff[0];
 	lsbval = buff[1];
 	int msb = 80;
 	int msb_bit = 0;
-	/*if (msb & buff)
+	
+        if (msb & buff)
 		msb_bit = 1;
-	else msb_bit = 0;*/
+	else msb_bit = 0;
 	
 	temp = ((msbval << 8) | lsbval) >> 4;
-	printf("%d\n", temp);
+	//printf("%d\n", temp);
 	
 	if (!msb_bit)
 	{	temp = temp*0.0625;
@@ -112,9 +111,11 @@ float read_temp_reg(int fd, int unit)
 			return Fail;
 		}
 	}
-	/*else 
+	else 
 	{
-		
+		temp = (temp ^ 0xFFF) + 0b1;
+		temp = temp * 0.0625;
+
 		if (unit == Celsius)
 		{
 			return temp;
@@ -135,23 +136,22 @@ float read_temp_reg(int fd, int unit)
 			printf("Invalid unit of temperature");
 			return Fail;
 		}
-	}*/
+	}
 	
-
-
+printf("Temp = %f", temp);
 }
 
 
-int write_config_reg(FILE *fd, uint16_t reg)
+int write_config_reg(int fd, uint16_t reg)
 {
 	write_pointer_reg(fd, Addr_config_reg);
-	int ret = write(fd, reg, sizeof(reg));
+	int ret = write(fd, &reg, sizeof(reg));
 	if (ret < 0)
 		perror("Write to config reg failed");
 
 }
  
-uint8_t read_config_reg(FILE *fd)
+uint8_t read_config_reg(int fd)
 {
 	uint16_t config_value;
 	uint8_t buff[1] = {0};
