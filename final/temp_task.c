@@ -46,7 +46,7 @@ void write_pointer_reg(int fd, uint8_t reg)
 	}	
 }
 
-uint16_t read_tlow_reg(FILE *fd)
+uint16_t read_tlow_reg(int fd)
 {
 	uint16_t tlow_value;
 	uint8_t buff[1] = {0};
@@ -60,7 +60,7 @@ uint16_t read_tlow_reg(FILE *fd)
 	return tlow_value;
 }
 
-uint16_t read_thigh_reg(FILE *fd)
+uint16_t read_thigh_reg(int fd)
 {
 	uint16_t thigh_value;
 	uint8_t buff[1] = {0};
@@ -150,22 +150,22 @@ float read_temp_reg(int fd, int unit)
 }
 
 
-int write_config_reg(FILE *fd, uint16_t reg)
+int write_config_reg(int fd, uint16_t reg)
 {
 	write_pointer_reg(fd, Addr_config_reg);
-	int ret = write(fd, reg, sizeof(reg));
+	int ret = write(fd, &reg, sizeof(reg));
 	if (ret < 0)
 		perror("Write to config reg failed");
 
 }
  
-uint8_t read_config_reg(FILE *fd)
+uint8_t read_config_reg(int fd)
 {
 	uint16_t config_value;
 	uint8_t buff[1] = {0};
 	
 	write_pointer_reg(fd, Addr_config_reg);
-	int ret =  read(fd,buff,sizeof(buff));
+	int ret =  read(fd,&buff,sizeof(buff));
 	if (ret < 0)
 		perror("Read config reg failed");
 	
