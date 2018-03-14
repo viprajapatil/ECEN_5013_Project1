@@ -30,17 +30,21 @@ int main()
     attr.mq_maxmsg = MAX_MESSAGES;
     attr.mq_msgsize = sizeof(float);
     //attr.mq_curmsgs = 0;
-	float* buff = 0;
-	
+	//float* buff = 0;
+	char final[1024];
+char* r;
 	logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
 	if (logger < 0) 
         printf("ERROR opening message queue\n");
 	
-	if (mq_receive (logger, buff, sizeof(float), NULL) < 0)
-		printf("ERROR mq_receive\n");
+	if (mq_receive (logger, r, sizeof(r), NULL) < 0)
+			printf("ERROR mq_receive\n");
 	else printf ("Temp task message received.\n");
+	char r1;
+	r1 = *r;
+	char buff = (char *)final;
 	
-    printf("Temp task received msg : %f\n", buff);
+    printf("Temp task received msg : %c\n", r1);
 
 	mq_unlink(SERVER_QUEUE_NAME);
 	
