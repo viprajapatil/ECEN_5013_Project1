@@ -5,6 +5,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <mqueue.h>
+#include <time.h>
 #include <errno.h>
 
 typedef struct {
@@ -22,20 +23,20 @@ int main()
 {
     mqd_t logger;   // queue descriptors   
     struct mq_attr attr;
+	FILE *fptr = fopen("projectlog.log","a");
+
+	time_t currenttime;
+	time(&currenttime);
+	char *timeStr = ctime(&currenttime);
+	fprintf(fptr,"Time: %s",timeStr);
 	
 	//message *ptr;
     	temp_data temp;
 	 char buff[sizeof(temp_data)] = {0};
-	 
-	
-	
-    //attr.mq_flags = 0;
+
     attr.mq_maxmsg = MAX_MESSAGES;
     attr.mq_msgsize = sizeof(temp_data);
-    //attr.mq_curmsgs = 0;
-	//float* buff = 0;
-	//char final[1024];
-//char* r;
+    
 	 
 	logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
 	if (logger < 0) 
@@ -44,12 +45,11 @@ int main()
 	if (mq_receive (logger, buff, sizeof(temp_data), NULL) < 0)
 			printf("ERROR mq_receive\n");
 	else printf ("Temp task message received.\n");
-	//char r1;
-	//r1 = *r;
+	
 	temp_data* ptr;
 	ptr = (temp_data*)(buff);
 	
-    printf("Temp task received msg : %f, %f\n", ptr->tempval, ptr->t);
+    fprintf(fptr,"Temp task received msg : %f, %f\n", ptr->tempval, ptr->t);
 
 	mq_unlink(SERVER_QUEUE_NAME);
 	
