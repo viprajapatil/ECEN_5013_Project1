@@ -102,13 +102,36 @@ void * light_thread_func()
 	close(sock);
 	}
 	//light_task_life = 0;*/
-	/*int fd = light_sensor_setup();
+	int fd = light_sensor_setup();
 	float lux;
-	//while(1)
+
+	mqd_t logger;   // queue descriptors   
+   	struct mq_attr attr;
+
+	attr.mq_maxmsg = MAX_MESSAGES;
+    	attr.mq_msgsize = sizeof(temp_data);
+
+	while(1)
 	{
 		lux = get_lux_value(fd);
 		printf("LUX: %f", lux);
-	}*/
+		temp_data temp;
+	
+		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        	printf("ERROR opening message queue\n");
+	
+		temp.tempval = lux;
+		temp.t = 8;
+		temp.log_source_id = Light_task;
+		char* buffptr = (char*)(&temp);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+
+		//loggerFN();
+		sleep(1);
+	}
 }
 
 void * temp_thread_func()
@@ -128,7 +151,7 @@ void * temp_thread_func()
     	attr.mq_maxmsg = MAX_MESSAGES;
     	attr.mq_msgsize = sizeof(temp_data);
 
-	//while(1)
+	while(1)
 	{
 		value = read_temp_reg(fd,Celsius);
 		printf("TEMP: %f", value);
@@ -144,11 +167,9 @@ void * temp_thread_func()
 	
 		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
 		printf("ERROR mq_send\n");
+
 		sleep(1);
 
-		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
-		printf("ERROR mq_send\n");
-		sleep(1);
 		//mq_unlink(SERVER_QUEUE_NAME);*/
 	}
 }
@@ -157,7 +178,7 @@ void * logger_thread_func()
 {
 	//logger_task_life = 0;
 	//while(1);
-	logger();
+	loggerFN();
 }
 
 void * socket_thread_func()
@@ -227,7 +248,7 @@ void * socket_thread_func()
 	}
 	}
 	exit(1);*/
-	//socket_server();
+	socket_server();
 }
 
 void check_status()
@@ -323,7 +344,7 @@ void main()
     	attr.mq_maxmsg = MAX_MESSAGES;
     	attr.mq_msgsize = sizeof(temp_data);
 
-	/*logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+	logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
 	if (logger < 0) 
         printf("ERROR opening message queue\n");
 	
@@ -333,7 +354,7 @@ void main()
 	char* buffptr = (char*)(&temp);
 	
 	if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
-	printf("ERROR mq_send\n");*/
+	printf("ERROR mq_send\n");
 
 	light_thread_check = pthread_create(&light_thread, NULL, light_thread_func, NULL);
 	if(light_thread_check)
