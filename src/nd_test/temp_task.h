@@ -47,3 +47,4 @@ int write_config_reg(int fd, uint16_t reg);
 uint8_t read_config_reg(int fd);
 
 int temp_init();
+
