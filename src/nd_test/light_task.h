@@ -54,8 +54,3 @@ uint16_t read_data0_reg(int fd);
 uint16_t read_data1_reg(int fd);
 
 float get_lux_value(int fd);
-
-
-
-
-
