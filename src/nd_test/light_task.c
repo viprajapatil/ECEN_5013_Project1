@@ -412,5 +412,3 @@ float get_lux_value(int fd)
 //}
 	
 	
-
-
