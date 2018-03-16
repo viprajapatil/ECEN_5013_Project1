@@ -188,3 +188,4 @@ int temp_init()
 	
 	//mq_unlink(SERVER_QUEUE_NAME);*/
 //}
+
