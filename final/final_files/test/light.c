@@ -1,5 +1,5 @@
 // light task
-#include "light_task.h"
+#include "ligh.h"
 
 uint8_t light_sensor_setup()
 {
