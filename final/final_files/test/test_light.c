@@ -17,8 +17,8 @@ void test_control_reg(void **state)
 {
 	int fd = light_sensor_setup();
 	int a = 5;
-	int wpr = write_control_reg(fd, a);
-	int status =read_control_reg(fd);	
+	uint8_t wpr = write_control_reg(fd, a);
+	uint8_t status =read_control_reg(fd);	
 	assert_int_equal(status, wpr);
 }
 
@@ -26,8 +26,8 @@ void test_timing_reg(void **state)
 {
 	int fd = light_sensor_setup();
 	int a = 5;
-	int wpr = write_timing_reg(fd, a);
-	int status =read_timing_reg(fd);	
+	uint8_t wpr = write_timing_reg(fd, a);
+	uint8_t status =read_timing_reg(fd);	
 	assert_int_equal(status, wpr);
 }
 
