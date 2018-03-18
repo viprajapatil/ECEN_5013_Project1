@@ -21,11 +21,13 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #include "light_task.h"
 #include "temp_task.h"
 #include "logger_task.h"
 #include "socket_task.h"
+#include "userled.h"
 
 #define queue_name 		"/my_queue"
 #define queue_size		8
@@ -109,8 +111,9 @@ void * light_thread_func()
         	printf("ERROR opening message queue\n");
 	
 		temp.tempval = lux;
-		temp.t = 8;
+		//temp.t = 8;
 		temp.log_source_id = Light_task;
+		temp.level = 1;
 		char* buffptr = (char*)(&temp);
 	
 		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
@@ -130,10 +133,11 @@ void * light_thread_func()
         	printf("ERROR opening message queue\n");
 	
 		temp.tempval = 0;
-		temp.t = 4;
+		//temp.t = 4;
 		temp.log_source_id = Main_task;
+		temp.level = 2;
 		char* buffptr = (char*)(&temp);
-	
+		userLED(2,1);
 		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
 		printf("ERROR mq_send\n");
 		exit(1);
@@ -195,7 +199,7 @@ void * temp_thread_func()
 	}
 	close(sock);		
 		
-		value = read_temp_reg(fd,Kelvin);
+		value = read_temp_reg(fd,Celsius);
 		printf("TEMP: %f", value);
 		
 		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
@@ -203,8 +207,9 @@ void * temp_thread_func()
         	printf("ERROR opening message queue\n");
 	
 		temp.tempval = value;
-		temp.t = 7;
+		//temp.t = 7;
 		temp.log_source_id = Temp_task;
+		temp.level = 1;
 		char* buffptr = (char*)(&temp);
 	
 		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
@@ -226,10 +231,11 @@ void * temp_thread_func()
         	printf("ERROR opening message queue\n");
 	
 		temp.tempval = 0;
-		temp.t = 4;
+		//temp.t = 4;
 		temp.log_source_id = Main_task;
+		temp.level = 2;
 		char* buffptr = (char*)(&temp);
-	
+		userLED(2,1);
 		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
 		printf("ERROR mq_send\n");
 		exit(1);
@@ -299,9 +305,11 @@ void * logger_thread_func()
         	printf("ERROR opening message queue\n");
 	
 		temp.tempval = 0;
-		temp.t = 4;
+		//temp.t = 4;
 		temp.log_source_id = Main_task;
+		temp.level = 2;
 		char* buffptr = (char*)(&temp);
+		userLED(2,1);
 	
 		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
 		printf("ERROR mq_send\n");
@@ -312,7 +320,77 @@ void * logger_thread_func()
 void * socket_thread_func()
 {
 	socket_server();
+
+	float* buff;
+	char * finalptr;
+	temp_data temp;
+	int command;
+	int sock;
+
+	mqd_t logger;   // queue descriptors   
+   	struct mq_attr attr;
+
+	while(1)
+	{
+	struct sockaddr_in check_server;
+	char buff[1024];
+	struct hostent *hp;
+	
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if(sock < 0)
+	{
+		perror("socket failed");
+		exit(1);
+	}
+	check_server.sin_family = AF_INET;
+	hp = gethostbyname("localhost");
+	if(hp == 0)
+	{
+		perror("gethost failed");
+		exit(1);
+	}
+	memcpy(&check_server.sin_addr, hp->h_addr, hp->h_length);
+	check_server.sin_port = htons(6006);
+	
+	if(connect(sock, (struct sockaddr *)&check_server, sizeof(check_server)) < 0)
+	{
+		perror("connection failes");
+		exit(1);
+	}
+
+	command = Socket;
+	
+	
+	if(send(sock, (void*)&command, sizeof(command), 0) < 0)
+	{
+		perror("Send failed");
+		exit(1);
+	}
+	close(sock);
+	}
+	command = Dead;
+	if(send(sock, (void*)&command, sizeof(command), 0) < 0)
+	{
+		perror("Send failed");
+		printf("Some thread dead, Terminating process\n");
+
+		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        	printf("ERROR opening message queue\n");
+	
+		temp.tempval = 0;
+		//temp.t = 4;
+		temp.log_source_id = Main_task;
+		temp.level = 2;
+		char* buffptr = (char*)(&temp);
+		userLED(2,1);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+		exit(1);
+	}
 }
+
 
 bool startup()
 {
@@ -438,6 +516,7 @@ void main()
 	int logger_thread_check;
 	int socket_thread_check;
 	int d;
+	userLED(2,0);
 	printf("Getting started with things, Main task initiated\n");
 
 	mqd_t logger;   // queue descriptors   
@@ -447,20 +526,21 @@ void main()
 	char * finalptr;
 	temp_data temp;
 	
-    	attr.mq_maxmsg = MAX_MESSAGES;
-    	attr.mq_msgsize = sizeof(temp_data);
+    	//attr.mq_maxmsg = MAX_MESSAGES;
+    	//attr.mq_msgsize = sizeof(temp_data);
 
 	logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
 	if (logger < 0) 
         printf("ERROR opening message queue\n");
 	
 	temp.tempval = 0;
-	temp.t = 0;
-	temp.log_source_id = Main_task;
+	//temp.t = 0;
+	temp.log_source_id = 2;
+	temp.level = 0;
 	char* buffptr = (char*)(&temp);
 	
-	if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
-	printf("ERROR mq_send\n");
+	if (mq_send (logger, (char*)(&temp), sizeof(temp), 1) == -1)
+	perror("ERROR mq_send, %s \n");
 	
 	printf("Initializing creation of thread processes\n");
 
@@ -468,6 +548,7 @@ void main()
 	if(light_thread_check)
 	{
 		perror("Error creating light thread");
+		userLED(2,1);
 		exit(-1);
 	}
 	else
@@ -479,7 +560,8 @@ void main()
         		printf("ERROR opening message queue\n");
 	
 		temp.tempval = 0;
-		temp.t = 1;
+		//temp.t = 1;
+		temp.level = 3;
 		temp.log_source_id = Main_task;
 		char* buffptr = (char*)(&temp);
 	
@@ -491,6 +573,7 @@ void main()
 	if(temp_thread_check)
 	{
 		perror("Error creating temp thread");
+		userLED(2,1);
 		exit(-1);
 	}
 	else
@@ -502,7 +585,8 @@ void main()
         		printf("ERROR opening message queue\n");
 	
 		temp.tempval = 0;
-		temp.t = 2;
+		//temp.t = 2;
+		temp.level = 3;
 		temp.log_source_id = Main_task;
 		char* buffptr = (char*)(&temp);
 	
@@ -514,6 +598,7 @@ void main()
 	if(logger_thread_check)
 	{
 		perror("Error creating logger thread");
+		userLED(2,1);
 		exit(-1);
 	}
 	else
@@ -525,7 +610,8 @@ void main()
         		printf("ERROR opening message queue\n");
 	
 		temp.tempval = 0;
-		temp.t = 3;
+		//temp.t = 3;
+		temp.level = 3;
 		temp.log_source_id = Main_task;
 		char* buffptr = (char*)(&temp);
 	
@@ -537,6 +623,7 @@ void main()
 	if(socket_thread_check)
 	{
 		perror("Error creating socket thread");
+		userLED(2,1);
 		exit(-1);
 	}
 	else
@@ -548,7 +635,8 @@ void main()
         		printf("ERROR opening message queue\n");
 	
 		temp.tempval = 0;
-		temp.t = 5;
+		//temp.t = 5;
+		temp.level = 3;
 		temp.log_source_id = Main_task;
 		char* buffptr = (char*)(&temp);
 	
@@ -557,7 +645,10 @@ void main()
 	}
 
 	if(!startup())
+	{
+		userLED(2,1);
 		exit(-1);
+	}
 
 	check_status();	
 
