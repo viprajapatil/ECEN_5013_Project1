@@ -1,5 +1,5 @@
 /*
-@file - temp.h
+@file - temp_task.h
 @brief - Header file of temp.c which includes all the functions for writing and reading various TMP102 registers
 @author - Nikhil Divekar & Vipraja Patil
 */
