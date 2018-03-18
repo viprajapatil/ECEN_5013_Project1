@@ -1,9 +1,3 @@
-/*
-@file - light_task.c
-@brief - Includes all the functions for writing and reading various APDS-9301 registers
-@author - Nikhil Divekar & Vipraja Patil
-*/
-
 // light task
 #include "light_task.h"
 #include "logger_task.h"
@@ -389,51 +383,7 @@ int is_it_day_or_night()
 	}
 }
 
-
-/*void main()
-{
-	//float data;
-	int fd = light_sensor_setup();
-	//write_control_reg(fd, 0x1);
-	/*uint8_t data;
-	data = command_start | control_reg;
-	if(write(fd, &data, 1) < 0)
-	{
-		perror("Write error");
-		exit(-1);
-	}
-	data = 5;
-	if(write(fd, &data, 1) < 0)
-	{
-		perror("Write error");
-		exit(-1);
-	}*/	
-	//data = read_control_reg(fd);
-
-	//uint8_t data;
-	/*data = command_start | control_reg;
-	if(write(fd, &data, 1) < 0)
-	{
-		perror("Write error");
-		exit(-1);
-	}
-	if(read(fd, &data, 1) < 0)
-	{
-		perror("Read error");
-		exit(-1);
-	}*/
-	//get_lux_value(fd);
-	/*float lux;
-	lux = get_lux_value(fd);
-	printf("%f", lux);
-	/*uint8_t value = 4;
-	value = write_timing_reg(fd, value);
-	value = read_timing_reg(fd);
-	printf("%d", value);*/
-	
-//}
 	
 	
-
 
 
