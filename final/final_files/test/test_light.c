@@ -1,4 +1,8 @@
-
+/*
+@file - test_light.c
+@brief - Unit test functions for testing various light sensor functions
+@author - Nikhil Divekar & Vipraja Patil
+*/
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
