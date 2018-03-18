@@ -1,93 +1,49 @@
-/*
-@file - test_light.c
-@brief - Unit test functions for testing various light sensor functions
-@author - Nikhil Divekar & Vipraja Patil
-*/
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "light_task.h"
+#include "temp.h"
 
-
-void test_light_init(void **state)
+void test_temp_init(void **state)
 {
-	int status = light_sensor_setup();	
+	int status = temp_init();	
 	assert_int_not_equal(status, -1);
 }
 
-void test_control_reg(void **state)
+void test_config_reg(void **state)
 {
-	int fd = light_sensor_setup();
-	uint8_t a = 5;
-	uint8_t wpr = write_control_reg(fd, a);
-	uint8_t status =read_control_reg(fd);	
-	assert_int_equal(status, wpr);
+	int fd = temp_init();
+	int wpr1 = write_pointer_reg(fd, Addr_config_reg);
+	wpr1++;
+	int wpr = write_config_reg(fd, 4096);
+	wpr++;
+	int status = read_config_reg(fd);	
+	assert_int_equal(status, 45152);
 }
 
-void test_timing_reg(void **state)
-{
-	int fd = light_sensor_setup();
-	int a = 5;
-	uint8_t wpr = write_timing_reg(fd, a);
-	uint8_t status =read_timing_reg(fd);	
-	assert_int_equal(status, wpr);
-}
 
-void test_int_control_reg(void **state)
+void test_temp_c(void **state)
 {
-	int fd = light_sensor_setup();
-	uint8_t a = 5;
-	uint8_t wpr = write_int_control_reg(fd, a);
-	uint8_t status =read_int_control_reg(fd);	
-	assert_int_equal(status, wpr);
-}
-
-/*void test_interrupt_threshold_reg(void **state)
-{
-	int fd = light_sensor_setup();
-	uint8_t a = 5;
-	uint8_t wpr = write_interrupt_threshold_reg(fd, &a);
-	uint8_t status = read_interrupt_threshold_reg(fd, &a);	
-	assert_int_equal(status, wpr);
-}*/
-
-void test_flux_value(void **state)
-{
-	int fd = light_sensor_setup();
-	float lux = get_lux_value(fd);	
+	int fd = temp_init();
+	float temp = read_temp_reg(fd, Celsius);
 	int status;
-	if (lux < -150 && lux> 1500)
-	{	
+	if (temp < -55 && temp > 128)
 		status = 1;
-	}
-	else status = 0;
-	assert_int_not_equal(status, 1);
+	else status = 0;	
+	assert_int_equal(status, 0);
 }
 
-void test_id_reg(void **state)
-{
-	int fd = light_sensor_setup();
-	int a = 7;
-	uint8_t wpr = write_id_reg(fd, a);
-	uint8_t status =read_id_reg(fd);	
-	assert_int_equal(status, wpr);
-}
 
 int main(int argc, char **argv)
 {
   const struct CMUnitTest tests[] = 
   {	
-	cmocka_unit_test(test_light_init),
-	cmocka_unit_test(test_control_reg),
-	cmocka_unit_test(test_timing_reg),
-	cmocka_unit_test(test_int_control_reg),
-	//cmocka_unit_test(test_interrupt_threshold_reg),
-	cmocka_unit_test(test_flux_value),
-	cmocka_unit_test(test_id_reg),
-
+	cmocka_unit_test(test_temp_init),
+	cmocka_unit_test(test_config_reg),
+	cmocka_unit_test(test_temp_c)
   };
 
   return cmocka_run_group_tests(tests, NULL, NULL);
