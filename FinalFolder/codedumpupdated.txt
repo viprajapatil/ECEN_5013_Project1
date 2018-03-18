@@ -1,0 +1,2068 @@
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <netdb.h>
+
+typedef enum
+{
+    Light = 0,
+    Temp = 1
+}command_enum;
+
+void main(int argc, char *argv[])
+{
+	//while(1)
+	{
+	int sock;
+	struct sockaddr_in server;
+	char buff[1024];
+	struct hostent *hp;
+	int command;
+	
+	printf("List of commands available:\n");
+	printf("1. Get temp output in Celsius\n");
+	printf("2. Get temp output in Kelvin\n");
+	printf("3. Get temp output in Fahrenheit\n");
+	printf("4. Get lumen output\n");
+	printf("5. Is it day or night?\n");
+	printf("Enter approprate command number\n");
+
+	scanf("%d", &command);
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if(sock < 0)
+	{
+		perror("socket failed");
+		exit(1);
+	}
+	server.sin_family = AF_INET;
+	hp = gethostbyname(argv[1]);
+	if(hp == 0)
+	{
+		perror("gethost failed");
+		exit(1);
+	}
+	memcpy(&server.sin_addr, hp->h_addr, hp->h_length);
+	server.sin_port = htons(6001);
+	
+	if(connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0)
+	{
+		perror("connection failes");
+		exit(1);
+	}
+
+	//int command = Light;
+	
+	
+	if(send(sock, (void*)&command, sizeof(command), 0) < 0)
+	{
+		perror("Send failed");
+		exit(1);
+	}
+	printf("Sent : %d \n", command);
+	//sleep(1);
+
+	//int mysock;
+	//mysock = accept(sock, (struct sockaddr *)0, 0);
+
+	float incoming;
+	int data_in = read(sock, &incoming, sizeof(incoming));
+        if (data_in < 0)
+	{	 
+        	perror("Read failed");
+		exit(1);
+	}
+	printf("Data got back: %f", incoming);
+
+	//close(sock);
+	//exit(1);
+	sleep(1);
+	}
+}
+
+/*
+@file - maint_task.c
+@brief - Includes all the main and thread create funcytions
+@author - Nikhil Divekar & Vipraja Patil
+*/
+
+#include <stdio.h>
+#include <stdint.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <fcntl.h> 
+#include <sys/stat.h>
+#include <mqueue.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <stdbool.h>
+
+
+#include "light_task.h"
+#include "temp_task.h"
+#include "logger_task.h"
+#include "socket_task.h"
+
+#define queue_name 		"/my_queue"
+#define queue_size		8
+
+#define SERVER_QUEUE_NAME   "/my_msg_queue_server"
+#define QUEUE_PERMISSIONS 0666
+#define MAX_MESSAGES 10
+#define MAX_MSG_SIZE 256
+#define MSG_BUFFER_SIZE MAX_MSG_SIZE + 10
+
+char log_name[50];
+
+int count = 0;
+
+pthread_t light_thread;
+pthread_t temp_thread;
+pthread_t logger_thread;
+pthread_t socket_thread;
+
+int light_task_life = 0;
+int temp_task_life = 0;
+int logger_task_life = 0;
+int socket_task_life = 0;
+
+
+void * light_thread_func()
+{
+	int fd = light_sensor_setup();
+	float lux;
+
+	mqd_t logger;   // queue descriptors   
+   	struct mq_attr attr;
+
+	attr.mq_maxmsg = MAX_MESSAGES;
+    	attr.mq_msgsize = sizeof(temp_data);
+	temp_data temp;
+	int command;
+	int sock;
+
+	while(1)
+	{
+		int sock;
+	struct sockaddr_in server;
+	char buff[1024];
+	struct hostent *hp;
+	
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if(sock < 0)
+	{
+		perror("socket failed");
+		exit(1);
+	}
+	server.sin_family = AF_INET;
+	hp = gethostbyname("localhost");
+	if(hp == 0)
+	{
+		perror("gethost failed");
+		exit(1);
+	}
+	memcpy(&server.sin_addr, hp->h_addr, hp->h_length);
+	server.sin_port = htons(6006);
+	
+	if(connect(sock, (struct sockaddr *)&server, sizeof(server)) < 0)
+	{
+		perror("connection failes");
+		exit(1);
+	}
+
+	int command = Light;
+	
+	
+	if(send(sock, (void*)&command, sizeof(command), 0) < 0)
+	{
+		perror("Send failed");
+		exit(1);
+	}
+	close(sock);
+		lux = get_lux_value(fd);
+		printf("LUX: %f", lux);
+		temp_data temp;
+	
+		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        	printf("ERROR opening message queue\n");
+	
+		temp.tempval = lux;
+		//temp.t = 8;
+		temp.log_source_id = Light_task;
+		temp.level = 1;
+		char* buffptr = (char*)(&temp);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+
+		//loggerFN();
+		sleep(1);
+	}
+	command = Dead;
+	if(send(sock, (void*)&command, sizeof(command), 0) < 0)
+	{
+		perror("Send failed");
+		printf("Some thread dead, Terminating process\n");
+
+		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        	printf("ERROR opening message queue\n");
+	
+		temp.tempval = 0;
+		//temp.t = 4;
+		temp.log_source_id = Main_task;
+		temp.level = 2;
+		char* buffptr = (char*)(&temp);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+		exit(1);
+	}
+}
+
+void * temp_thread_func()
+{
+	int fd;
+	float value;
+	fd = temp_init();
+	mqd_t logger;   // queue descriptors   
+   	struct mq_attr attr;
+	
+	float* buff;
+	char * finalptr;
+	temp_data temp;
+	int command;
+	int sock;
+	
+    	attr.mq_maxmsg = MAX_MESSAGES;
+    	attr.mq_msgsize = sizeof(temp_data);
+
+	while(1)
+	{
+	struct sockaddr_in check_server;
+	char buff[1024];
+	struct hostent *hp;
+	
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if(sock < 0)
+	{
+		perror("socket failed");
+		exit(1);
+	}
+	check_server.sin_family = AF_INET;
+	hp = gethostbyname("localhost");
+	if(hp == 0)
+	{
+		perror("gethost failed");
+		exit(1);
+	}
+	memcpy(&check_server.sin_addr, hp->h_addr, hp->h_length);
+	check_server.sin_port = htons(6006);
+	
+	if(connect(sock, (struct sockaddr *)&check_server, sizeof(check_server)) < 0)
+	{
+		perror("connection failes");
+		exit(1);
+	}
+
+	command = Light;
+	
+	
+	if(send(sock, (void*)&command, sizeof(command), 0) < 0)
+	{
+		perror("Send failed");
+		exit(1);
+	}
+	close(sock);		
+		
+		value = read_temp_reg(fd,Celsius);
+		printf("TEMP: %f", value);
+		
+		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        	printf("ERROR opening message queue\n");
+	
+		temp.tempval = value;
+		//temp.t = 7;
+		temp.log_source_id = Temp_task;
+		temp.level = 1;
+		char* buffptr = (char*)(&temp);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+		sleep(1);
+
+		//mq_unlink(SERVER_QUEUE_NAME);
+
+	
+	}
+	command = Dead;
+	if(send(sock, (void*)&command, sizeof(command), 0) < 0)
+	{
+		perror("Send failed");
+		printf("Some thread dead, Terminating process\n");
+
+		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        	printf("ERROR opening message queue\n");
+	
+		temp.tempval = 0;
+		//temp.t = 4;
+		temp.log_source_id = Main_task;
+		temp.level = 2;
+		char* buffptr = (char*)(&temp);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+		exit(1);
+	}
+}
+
+void * logger_thread_func()
+{	
+	loggerFN(log_name);
+	mqd_t logger;   // queue descriptors   
+   	struct mq_attr attr;
+	
+	float* buff;
+	char * finalptr;
+	temp_data temp;
+	int command;
+	int sock;
+	
+    	attr.mq_maxmsg = MAX_MESSAGES;
+    	attr.mq_msgsize = sizeof(temp_data);
+	while(1)
+	{
+	struct sockaddr_in check_server;
+	char buff[1024];
+	struct hostent *hp;
+	
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if(sock < 0)
+	{
+		perror("socket failed");
+		exit(1);
+	}
+	check_server.sin_family = AF_INET;
+	hp = gethostbyname("localhost");
+	if(hp == 0)
+	{
+		perror("gethost failed");
+		exit(1);
+	}
+	memcpy(&check_server.sin_addr, hp->h_addr, hp->h_length);
+	check_server.sin_port = htons(6006);
+	
+	if(connect(sock, (struct sockaddr *)&check_server, sizeof(check_server)) < 0)
+	{
+		perror("connection failes");
+		exit(1);
+	}
+
+	command = Logger;
+	
+	
+	if(send(sock, (void*)&command, sizeof(command), 0) < 0)
+	{
+		perror("Send failed");
+		exit(1);
+	}
+	close(sock);
+	}
+	command = Dead;
+	if(send(sock, (void*)&command, sizeof(command), 0) < 0)
+	{
+		perror("Send failed");
+		printf("Some thread dead, Terminating process\n");
+
+		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        	printf("ERROR opening message queue\n");
+	
+		temp.tempval = 0;
+		//temp.t = 4;
+		temp.log_source_id = Main_task;
+		temp.level = 2;
+		char* buffptr = (char*)(&temp);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+		exit(1);
+	}
+}
+
+void * socket_thread_func()
+{
+	socket_server();
+}
+
+bool startup()
+{
+	int fd = temp_init();
+	if (fd < 0)
+	{
+		printf("Temperature sensor intialization failed.\n");
+		return false;
+	}
+	float value = read_temp_reg(fd,Celsius);
+	if (value < -40 && value > 128)
+	{
+		printf("Temp out of range.\n");
+		return false;
+	}
+	
+	fd = light_sensor_setup();
+	if (fd < 0)
+	{
+		printf("Light sensor intialization failed.\n");
+		return false;
+	}
+	float lux = get_lux_value(fd);
+	if (lux < -100 && lux > 1500)
+	{
+		printf("Lux value out of range.\n");
+		return false;
+	}
+	if (!temp_task_life)
+	{
+		printf("Temperature thread creation failed. \n");
+		return false;
+	}
+	if (!light_task_life)
+	{
+		printf("Light thread creation failed. \n");
+		return false;
+	}
+	if (!logger_task_life)
+	{
+		printf("Logger thread creation failed. \n");
+		return false;
+	}
+	if (!socket_task_life)
+	{
+		printf("Socket thread creation failed. \n");
+		return false;
+	}
+	printf("Startup tests successful, proceeding with actual functionalities\n");
+	return true;
+
+}
+
+void check_status()
+{
+	int sock;
+	struct sockaddr_in check_server;
+	int mysock;
+	char buff[1024];
+	int rval;
+	int flag = 0;
+	//create socket
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if(sock < 0)
+	{
+		perror("Failed to create a socket");
+		exit(1);
+	}
+	
+	check_server.sin_family = AF_INET;
+	check_server.sin_addr.s_addr = INADDR_ANY;
+	check_server.sin_port = htons(6006);
+	
+	//bind
+	if(bind(sock, (struct sockaddr *)&check_server, sizeof(check_server)) < 0)
+	{
+		perror("Didn't bind");
+		exit(1);
+	}
+
+	//Listen
+	if(listen(sock, 5) < 0)
+	{
+		perror("Listening error");
+		exit(1);
+	}
+
+	//Accept
+	while(1)
+	{
+	mysock = accept(sock, (struct sockaddr *)0, 0);
+	if(mysock == -1)
+	{
+		perror("Accept failed");
+		exit(1);
+	}
+	int incoming;
+	
+	int data_in = read(mysock,&incoming,sizeof(incoming));
+     
+	if (data_in < 0)
+	{ 
+		perror("Error reading");
+		exit(1);
+	}
+
+	if(incoming  == 2)
+	{
+		printf("Temp task Dead\n");
+		break;
+	}
+
+	}
+	exit(1);
+}
+
+
+
+void main(int argc, char *argv[])
+{
+	int light_thread_check;
+	int temp_thread_check;
+	int logger_thread_check;
+	int socket_thread_check;
+	int d;
+	printf("Getting started with things, Main task initiated\n");
+
+	memset(log_name, '\0', sizeof(log_name));
+	strncpy(log_name, argv[1], strlen(argv[1]));
+
+	mqd_t logger;   // queue descriptors   
+   	struct mq_attr attr;
+	
+	float* buff;
+	char * finalptr;
+	temp_data temp;
+	
+    	//attr.mq_maxmsg = MAX_MESSAGES;
+    	//attr.mq_msgsize = sizeof(temp_data);
+
+	logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+	if (logger < 0) 
+        printf("ERROR opening message queue\n");
+	
+	temp.tempval = 0;
+	//temp.t = 0;
+	temp.log_source_id = 2;
+	temp.level = 0;
+	char* buffptr = (char*)(&temp);
+	
+	if (mq_send (logger, (char*)(&temp), sizeof(temp), 1) == -1)
+	perror("ERROR mq_send, %s \n");
+	
+	printf("Initializing creation of thread processes\n");
+
+	light_thread_check = pthread_create(&light_thread, NULL, light_thread_func, NULL);
+	if(light_thread_check)
+	{
+		perror("Error creating light thread");
+		exit(-1);
+	}
+	else
+	{
+		light_task_life = 1;
+		printf("Light thread created\n");
+		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        		printf("ERROR opening message queue\n");
+	
+		temp.tempval = 0;
+		//temp.t = 1;
+		temp.level = 3;
+		temp.log_source_id = Main_task;
+		char* buffptr = (char*)(&temp);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+	}
+
+	temp_thread_check = pthread_create(&temp_thread, NULL, temp_thread_func, NULL);
+	if(temp_thread_check)
+	{
+		perror("Error creating temp thread");
+		exit(-1);
+	}
+	else
+	{
+		printf("Temp thread created\n");
+		temp_task_life = 1;
+		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        		printf("ERROR opening message queue\n");
+	
+		temp.tempval = 0;
+		//temp.t = 2;
+		temp.level = 3;
+		temp.log_source_id = Main_task;
+		char* buffptr = (char*)(&temp);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+	}
+
+	logger_thread_check = pthread_create(&logger_thread, NULL, logger_thread_func, NULL);
+	if(logger_thread_check)
+	{
+		perror("Error creating logger thread");
+		exit(-1);
+	}
+	else
+	{
+		printf("Logger thread created\n");
+		logger_task_life = 1;
+		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        		printf("ERROR opening message queue\n");
+	
+		temp.tempval = 0;
+		//temp.t = 3;
+		temp.level = 3;
+		temp.log_source_id = Main_task;
+		char* buffptr = (char*)(&temp);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+	}
+	
+	socket_thread_check = pthread_create(&socket_thread, NULL, socket_thread_func, NULL);
+	if(socket_thread_check)
+	{
+		perror("Error creating socket thread");
+		exit(-1);
+	}
+	else
+	{
+		printf("Socket thread created\n");
+		socket_task_life = 1;
+		logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        		printf("ERROR opening message queue\n");
+	
+		temp.tempval = 0;
+		//temp.t = 5;
+		temp.level = 3;
+		temp.log_source_id = Main_task;
+		char* buffptr = (char*)(&temp);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+	}
+
+	if(!startup())
+		exit(-1);
+
+	check_status();	
+
+	pthread_join(light_thread, NULL);
+	pthread_join(temp_thread, NULL);
+	pthread_join(logger_thread, NULL);
+	pthread_join(socket_thread, NULL);
+}
+
+#include <stdarg.h>
+#include <stddef.h>
+#include <setjmp.h>
+#include <cmocka.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "temp.h"
+
+void test_temp_init(void **state)
+{
+	int status = temp_init();	
+	assert_int_not_equal(status, -1);
+}
+
+void test_config_reg(void **state)
+{
+	int fd = temp_init();
+	int wpr1 = write_pointer_reg(fd, Addr_config_reg);
+	wpr1++;
+	int wpr = write_config_reg(fd, 4096);
+	wpr++;
+	int status = read_config_reg(fd);	
+	assert_int_equal(status, 45152);
+}
+
+
+void test_temp_c(void **state)
+{
+	int fd = temp_init();
+	float temp = read_temp_reg(fd, Celsius);
+	int status;
+	if (temp < -55 && temp > 128)
+		status = 1;
+	else status = 0;	
+	assert_int_equal(status, 0);
+}
+
+
+int main(int argc, char **argv)
+{
+  const struct CMUnitTest tests[] = 
+  {	
+	cmocka_unit_test(test_temp_init),
+	cmocka_unit_test(test_config_reg),
+	cmocka_unit_test(test_temp_c)
+  };
+
+  return cmocka_run_group_tests(tests, NULL, NULL);
+}
+/*
+@file - temp_task.c
+@brief - Includes all the functions for writing and reading various TMP102 registers
+@author - Nikhil Divekar & Vipraja Patil
+*/
+
+#include "temp_task.h"
+
+uint8_t write_pointer_reg(int fd, uint8_t reg)
+{
+	int ret = write(fd, &reg, sizeof(reg));
+	if (ret < 0)
+	{
+		perror("Write to pointer reg failed");
+	}
+	return reg;
+}
+
+uint16_t read_tlow_reg(int fd)
+{
+
+	uint16_t buff;
+	write_pointer_reg(fd, Addr_tlow_reg);
+	int ret =  read(fd,&buff,sizeof(buff));
+	if (ret < 0)
+		perror("Read tlow reg failed");
+	
+	return buff;
+}
+	
+uint16_t write_tlow_reg(int fd, uint16_t reg)
+{
+	write_pointer_reg(fd, Addr_tlow_reg);
+	uint8_t t1, t2;
+	t1 = (Tlow_default |reg)>>8;
+    	t2 = (Tlow_default |reg);
+    	uint8_t buff[3] = {Addr_tlow_reg , t2, t1};	
+	int ret = write(fd, &buff, 3);
+	if (ret < 0)
+	{
+		perror("Write to pointer reg failed");
+	}
+	return reg; 	
+}
+
+uint16_t read_thigh_reg(int fd)
+{
+	uint16_t thigh_value;
+	uint8_t buff[2] = {0};
+	uint8_t msbval, lsbval;
+	write_pointer_reg(fd, Addr_thigh_reg);
+	int ret =  read(fd,buff,sizeof(buff));
+	if (ret < 0)
+		perror("Read thigh reg failed");
+	
+	msbval = buff[0];
+	lsbval = buff[1];
+	thigh_value = ((msbval << 8) | lsbval) >> 4; 
+	return thigh_value;
+}
+
+uint16_t write_thigh_reg(int fd, uint16_t reg)
+{
+	write_pointer_reg(fd, Addr_thigh_reg);
+	uint8_t t1, t2;
+	t1 = (Thigh_default |reg)>>8;
+    	t2 = (Thigh_default |reg);
+    	uint8_t buff[3] = {Addr_thigh_reg , t2, t1};
+	int ret = write(fd, &buff, sizeof(reg));
+	if (ret < 0)
+	{
+		perror("Write to pointer reg failed");
+	}
+	return reg; 	
+}
+
+float read_temp_reg(int fd, int unit)
+{
+	
+	int temp;
+	float final_temp;
+  	uint8_t msbval, lsbval;
+	uint8_t buff[2];
+	write_pointer_reg(fd, Addr_temp_reg);
+	int ret = read(fd, &buff, sizeof(buff));
+	if (ret != 2)
+		perror("Read temp reg failed");
+	
+	msbval = buff[0];
+	lsbval = buff[1];
+	uint8_t msb = 0x8;
+	int msb_bit = 0;
+	/*if (msb & msbval)
+		msb_bit = 1;
+	else msb_bit = 0;*/
+	
+	temp = ((msbval << 8) | lsbval) >> 4;
+	printf("%d\n", temp);
+	
+	if (!msb_bit)
+	{	final_temp = temp*0.0625;
+		if (unit == Celsius)
+		{
+			return final_temp;
+		}
+		else if (unit == Kelvin)
+		{
+			final_temp = final_temp + 273.5;
+			return final_temp;
+		}
+		else if (unit == Fahrenheit)
+		{
+			final_temp = (final_temp*1.8);
+			final_temp = final_temp + 32;
+			return final_temp;
+		}
+		else 
+		{
+			printf("Invalid unit of temperature");
+			return Fail;
+		}
+	}
+	else 
+	{
+		
+		if (unit == Celsius)
+		{
+			return temp;
+		}
+		else if (unit == Kelvin)
+		{
+			temp = temp + 273.5;
+			return temp;
+		}
+		else if (unit == Fahrenheit)
+		{
+			temp = (temp*1.8);
+			temp = temp + 32;
+			return temp;
+		}
+		else 
+		{
+			printf("Invalid unit of temperature");
+			return Fail;
+		}
+	}
+}
+
+
+uint16_t write_config_reg(int fd, uint16_t reg)
+{
+	write_pointer_reg(fd, Addr_config_reg);
+	uint8_t t1, t2;
+	t1 = (Config_default |reg)>>8;
+    	t2 = (Config_default |reg);
+    	uint8_t buff[3] = {Addr_config_reg , t2, t1};	
+	int ret = write(fd, &buff, 3);
+	if (ret < 0)
+		perror("Write to config reg failed");
+	return reg;
+}
+
+ 
+uint16_t read_config_reg(int fd)
+{
+	uint16_t buff = 0;
+	
+	write_pointer_reg(fd, Addr_config_reg);
+	int ret =  read(fd,&buff,sizeof(buff));
+	if (ret < 0)
+		perror("Read config reg failed");
+	return buff;
+}
+
+
+
+int temp_init()
+{
+	char i2c_name[20] = "/dev/i2c-2";
+	int file;
+	file = open(i2c_name, O_RDWR);
+	if (file < 0) 
+	{
+		perror("Error in file opening");
+		exit(-1);
+	}
+	int addr = 0x48;
+
+	if (ioctl(file, I2C_SLAVE, addr) < 0) 
+	{
+		perror("Can't access the bus");
+		exit(-1);
+	}
+	return file;	
+}
+
+
+/*
+@file - temp_task.h
+@brief - Header file of temp.c which includes all the functions for writing and reading various TMP102 registers
+@author - Nikhil Divekar & Vipraja Patil
+*/
+
+#include <errno.h>
+#include <string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdint.h>
+#include <linux/i2c-dev.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <mqueue.h>
+#include <errno.h>
+
+enum{
+Celsius,
+Kelvin,
+Fahrenheit
+}Temp_unit;
+
+enum{
+	Success,
+	Fail
+}return_value;
+
+#define Addr_temp_reg    00
+#define Addr_config_reg  01
+#define Addr_tlow_reg    02
+#define Addr_thigh_reg   03
+
+#define Config_default   0xA060
+#define Tlow_default     75
+#define Thigh_default    80
+
+
+#define SERVER_QUEUE_NAME   "/my_msg_queue_server"
+#define QUEUE_PERMISSIONS 0666
+#define MAX_MESSAGES 10
+#define MAX_MSG_SIZE 256
+#define MSG_BUFFER_SIZE MAX_MSG_SIZE + 10
+
+/*
+@brief - 	write_pointer_reg
+			Write to pointer register
+@param -	file descriptor
+			Address of the register value to be written
+@return - 	value written to the register 
+*/
+uint8_t write_pointer_reg(int fd, uint8_t reg);
+
+/*
+@brief - 	write_thigh_reg
+			Write to THIGH register
+@param -	file descriptor
+			data to be written in the register
+@return - 	value written to the register 
+*/
+uint8_t read_pointer_reg(int fd);
+
+/*
+@brief - 	read_tlow_reg
+			Read value from TLOW register
+@param -	file descriptor
+@return - 	value read from the register 
+*/
+uint16_t read_tlow_reg(int fd);
+
+uint16_t write_tlow_reg(int fd, uint16_t reg);
+/*
+@brief - 	read_thigh_reg
+			Read value from THIGH register
+@param -	file descriptor
+@return - 	value read from the register 
+*/
+uint16_t read_thigh_reg(int fd);
+/*
+@brief - 	write_thigh_reg
+			Write to THIGH register
+@param -	file descriptor
+			data to be written in the register
+@return - 	value written to the register 
+*/
+uint16_t write_thigh_reg(int fd, uint16_t reg);
+
+/*
+@brief - 	read_temp_reg
+			Read temperature value from temperature register in Celsius, Kelvin or Fahrenheit
+@param -	file descriptor
+			Unit of temperature: Celsius, Kelvin or Fahrenheit
+@return - 	Temperature value
+*/
+float read_temp_reg(int fd, int unit);
+
+/*
+@brief - 	write_config_reg
+			Write to config register
+@param -	file descriptor
+			data to be written in the register
+@return - 	value written to the register 
+*/
+uint16_t write_config_reg(int fd, uint16_t reg);
+
+/*
+@brief - 	read_config_reg
+			Read value from config register
+@param -	file descriptor
+@return - 	Value read from the register
+*/
+uint16_t read_config_reg(int fd);
+
+/*
+@brief - 	temp_init
+			Initializing TMP102 sensor 
+@param -	
+@return - 	file descriptor
+*/
+int temp_init();
+#include "logger_task.h"
+
+pthread_mutex_t pmutex;
+
+void loggerFN(char log_name[50])
+{  
+    	struct mq_attr attr;
+	mqd_t logger;   // queue descriptors 
+	FILE *fptr = fopen(log_name,"w");
+
+	while(1)
+	{
+	FILE *fptr = fopen(log_name,"a");
+
+	time_t currenttime;
+	time(&currenttime);
+	char *timeStr = ctime(&currenttime);
+	fprintf(fptr,"Time: %s",timeStr);
+	
+	//message *ptr;
+    	temp_data temp;
+	char buff[sizeof(temp_data)] = {0};
+
+    	attr.mq_maxmsg = MAX_MESSAGES;
+   	attr.mq_msgsize = sizeof(temp_data);
+    
+	pthread_mutex_lock(&pmutex);
+	logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+	if (logger < 0) 
+        printf("ERROR opening message queue\n");
+	
+	if (mq_receive (logger, buff, sizeof(temp_data), NULL) < 0)
+			printf("ERROR mq_receive\n");
+	//else printf ("Temp task message received.\n");
+	pthread_mutex_unlock(&pmutex);
+	
+	temp_data* ptr;
+	ptr = (temp_data*)(buff);
+	char message[1024];
+	if(ptr -> log_source_id == 1)
+		strcpy(message, "Temperature recorded");
+	if(ptr -> log_source_id == 0)
+		strcpy(message, "Light lux recorded");
+	if(ptr -> log_source_id == 3)
+		strcpy(message, "External service requested data");
+	if(ptr -> log_source_id == 2 && ptr -> level == 0)
+		strcpy(message, "Initializing main task");
+	if(ptr -> log_source_id == 2 && ptr -> level == 3)
+		strcpy(message, "Threads created");
+	if(ptr -> log_source_id == 2 && ptr -> level == 2)
+		strcpy(message, "Terminating process");
+	
+    	fprintf(fptr,"Data: %f, Log Source: %d Log level: %d Message:%s\n", ptr->tempval, ptr->log_source_id, ptr-> level, message);
+	//printf("In logger received: %f", ptr -> tempval); 
+
+	fclose(fptr);
+
+	//mq_unlink(SERVER_QUEUE_NAME);
+	}
+}
+#include <stdio.h>
+#include <stdlib.h>
+
+void userLED(int LED_number, int on_off);
+#include <stdio.h>
+#include <stdint.h>
+#include <pthread.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <fcntl.h> 
+#include <sys/stat.h>
+#include <mqueue.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <netdb.h>
+
+#define SERVER_QUEUE_NAME   "/my_msg_queue_server"
+#define QUEUE_PERMISSIONS 0666
+#define MAX_MESSAGES 10
+#define MAX_MSG_SIZE 256
+#define MSG_BUFFER_SIZE MAX_MSG_SIZE + 10
+
+typedef struct {
+	int level;
+	float tempval;
+	//float t;
+	int log_source_id;
+	
+}temp_data;
+
+typedef enum
+{
+	Info,
+	Data,
+	Error,
+	thread_create
+}level_id;
+
+typedef enum
+{
+    Light = 0,
+    Temp = 1,
+    Dead = 2,
+    Logger = 3,
+    Socket = 4
+}command_enum;
+
+typedef enum
+{
+    Day = 0,
+    Night = 1
+}day_or_night;
+
+typedef enum
+{
+    Light_task = 0,
+    Temp_task = 1,
+    Main_task = 2,
+    Socket_task = 3
+}logger_source_id;
+
+void loggerFN();
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <unistd.h>
+#include <linux/i2c-dev.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <math.h>
+/*
+@file - ligh_task.h
+@brief - Header file of light_task.c which includes all the functions for writing and reading various APDS-9301 registers
+@author - Nikhil Divekar & Vipraja Patil
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <unistd.h>
+#include <linux/i2c-dev.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <math.h>
+
+#define slave_address 	0x39
+#define command_start 	0x80
+
+#define control_reg 	0x00
+#define timing_reg 	0x01
+#define th_low_low 	0x02
+#define th_low_high 	0x03
+#define th_high_low 	0x04
+#define th_high_high 	0x05
+#define interrupt_reg	0x06
+#define id_reg		0x0A
+#define data0_low_reg	0x0C
+#define data0_high_reg	0x0D
+#define data1_low_reg	0x0E
+#define data1_high_reg	0x0F
+
+#define control_value 	0x03
+
+#define i2c_name	"/dev/i2c-2"
+#define file_name	"my_file"
+
+/*
+@brief - 	light_sensor_setup
+			Initializing APDS-9301 sensor 
+@param -	
+@return - 	file descriptor
+*/
+uint8_t light_sensor_setup();
+
+/*
+@brief - 	write_command_register
+			Write to command register
+@param -	file descriptor
+@return - 	value written to the register 
+*/
+uint8_t write_command_register(int fd);
+
+/*
+@brief - 	read_control_reg
+			Read value from Control register
+@param -	file descriptor
+@return - 	value read from the register 
+*/
+uint8_t read_control_reg(int fd);
+
+/*
+@brief - 	write_control_register
+			Write to control register
+@param -	file descriptor
+			value to be written in the register
+@return - 	value written to the register 
+*/
+uint8_t write_control_reg(int fd, uint8_t write_val);
+
+/*
+@brief - 	read_timing_reg
+			Read value from Timing register
+@param -	file descriptor
+@return - 	value read from the register 
+*/
+uint8_t read_timing_reg(int fd);
+
+/*
+@brief - 	write_timing_register
+			Write to Timing register
+@param -	file descriptor
+			value to be written in the register
+@return - 	value written to the register 
+*/
+uint8_t write_timing_reg(int fd, uint8_t write_val);
+
+/*
+@brief - 	read_int_control_reg
+			Read value from Interrupt Control register
+@param -	file descriptor
+@return - 	value read from the register 
+*/
+uint8_t write_int_control_reg(int fd, uint8_t write_val);
+
+/*
+@brief - 	write_int_control_register
+			Write to Interrupt control register
+@param -	file descriptor
+			value to be written in the register
+@return - 	value written to the register 
+*/
+uint8_t read_int_control_reg(int fd);
+
+/*
+@brief - 	read_id_reg
+			Read value from Identification register
+@param -	file descriptor
+@return - 	value read from the register 
+*/
+uint8_t read_id_reg(int fd);
+
+/*
+@brief - 	write_id_register
+			Write to Identification register
+@param -	file descriptor
+			value to be written in the register
+@return - 	value written to the register 
+*/
+uint8_t write_id_reg(int fd, uint8_t write_val);
+
+/*
+@brief - 	read_interrupt_threshold_reg
+			Read value from Interrupt threshold register
+@param -	file descriptor
+@return - 	value read from the register 
+*/
+uint8_t * read_interrupt_threshold_reg(int fd, uint8_t * read_buffer);
+
+/*
+@brief - 	write_interrupt_threshold_register
+			Write to Interrupt threshold register
+@param -	file descriptor
+			value to be written in the register
+@return - 	value written to the register 
+*/
+uint8_t * write_interrupt_threshold_reg(int fd, uint8_t * write_buffer);
+
+/*
+@brief - 	read_data0_reg
+			Read value from Data0 register
+@param -	file descriptor
+@return - 	value read from the register 
+*/
+uint16_t read_data0_reg(int fd);
+
+/*
+@brief - 	read_data1_reg
+			Read value from Data0 register
+@param -	file descriptor
+@return - 	value read from the register 
+*/
+uint16_t read_data1_reg(int fd);
+
+/*
+@brief - 	get_lux_value
+			Get lux values 
+@param -	file descriptor
+@return - 	lux value 
+*/
+float get_lux_value(int fd);
+
+int is_it_day_or_night();
+
+
+
+
+
+
+// light task
+/*
+@file - socket_task.c
+@brief - Includes all the functions for socket server
+@author - Nikhil Divekar & Vipraja Patil
+*/
+
+#include "socket_task.h"
+#include "logger_task.h"
+#include "temp_task.h"
+#include "light_task.h"
+
+void socket_server()
+{
+	int sock;
+	struct sockaddr_in server, client;
+	int mysock;
+	char buff[1024];
+	int rval;
+
+	//create socket
+	sock = socket(AF_INET, SOCK_STREAM, 0);
+	if(sock < 0)
+	{
+		perror("Failed to create a socket");
+		exit(1);
+	}
+	
+	server.sin_family = AF_INET;
+	server.sin_addr.s_addr = INADDR_ANY;
+	server.sin_port = htons(6001);
+	
+	//bind
+	if(bind(sock, (struct sockaddr *)&server, sizeof(server)) < 0)
+	{
+		perror("Didn't bind");
+		exit(1);
+	}
+
+	//Listen
+	if(listen(sock, 5) < 0)
+	{
+		perror("Listening error");
+		exit(1);
+	}
+
+	//Accept
+	while(1)
+	{
+	mysock = accept(sock, (struct sockaddr *)0, 0);
+	if(mysock == -1)
+	{
+		perror("Accept failed");
+		exit(1);
+	}
+	int incoming;
+	int data_in = read(mysock,&incoming,sizeof(incoming));
+     	mqd_t logger;   // queue descriptors   
+   	struct mq_attr attr;
+
+	attr.mq_maxmsg = MAX_MESSAGES;
+    	attr.mq_msgsize = sizeof(temp_data);
+	temp_data temp;
+
+	logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+		if (logger < 0) 
+        		printf("ERROR opening message queue\n");
+	
+		temp.tempval = 0;
+		//temp.t = 7;
+		temp.log_source_id = Socket_task;
+		temp.level = 0;
+		char* buffptr = (char*)(&temp);
+	
+		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
+		printf("ERROR mq_send\n");
+
+	logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
+	if (logger < 0) 
+        printf("ERROR opening message queue\n");
+	
+	
+	if (data_in < 0)
+	{ 
+		perror("Error reading");
+		exit(1);
+	}
+        printf("Message: %d \n", incoming);
+
+	if(incoming == 4)
+	{
+		//call get_light_task
+		printf("Light task called \n");
+		int fd = light_sensor_setup();
+		float lux = get_lux_value(fd);
+		printf("LUX: %f", lux);
+		temp_data temp;
+
+		int data_out = send(mysock, (void*)&lux, sizeof(lux), 0);
+		if (data_out < 0)
+		{
+			perror("Error writing");
+			exit(1);
+		}
+		else
+			printf("Data sent back");
+	}
+	else if(incoming == 1)
+	{
+		//call get temp task
+		printf("temp task called \n");
+		int fd = temp_init();
+		float value = read_temp_reg(fd,Celsius);
+		printf("TEMP: %f", value);
+
+		int data_out = send(mysock, (void*)&value, sizeof(value), 0);
+		if (data_out < 0)
+		{
+			perror("Error writing");
+			exit(1);
+		}
+		printf("Data sent back");
+	}
+	else if(incoming == 2)
+	{
+		//call get temp task
+		printf("temp task called \n");
+		int fd = temp_init();
+		float value = read_temp_reg(fd,Kelvin);
+		printf("TEMP: %f", value);
+
+		int data_out = send(mysock, (void*)&value, sizeof(value), 0);
+		if (data_out < 0)
+		{
+			perror("Error writing");
+			exit(1);
+		}
+		printf("Data sent back");
+	}
+	else if(incoming == 3)
+	{
+		//call get temp task
+		printf("temp task called \n");
+		int fd = temp_init();
+		float value = read_temp_reg(fd,Fahrenheit);
+		printf("TEMP: %f", value);
+
+		int data_out = send(mysock, (void*)&value, sizeof(value), 0);
+		if (data_out < 0)
+		{
+			perror("Error writing");
+			exit(1);
+		}
+		printf("Data sent back");
+	}
+	else if(incoming == 5)
+	{
+		//call get_light_task
+		printf("Light task called \n");
+		int fd = light_sensor_setup();
+		float lux = get_lux_value(fd);
+		int DN = is_it_day_or_night(lux);
+		//printf("LUX: %f", lux);
+		temp_data temp;
+
+		int data_out = send(mysock, (void*)&DN, sizeof(DN), 0);
+		if (data_out < 0)
+		{
+			perror("Error writing");
+			exit(1);
+		}
+		else
+			printf("Data sent back");
+	}
+	}
+	exit(1);
+}
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <netdb.h>
+
+void socket_server();
+/*
+@file - test_light.c
+@brief - Unit test functions for testing various light sensor functions
+@author - Nikhil Divekar & Vipraja Patil
+*/
+#include <stdarg.h>
+#include <stddef.h>
+#include <setjmp.h>
+#include <cmocka.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include "light_task.h"
+
+
+void test_light_init(void **state)
+{
+	int status = light_sensor_setup();	
+	assert_int_not_equal(status, -1);
+}
+
+void test_control_reg(void **state)
+{
+	int fd = light_sensor_setup();
+	uint8_t a = 5;
+	uint8_t wpr = write_control_reg(fd, a);
+	uint8_t status =read_control_reg(fd);	
+	assert_int_equal(status, wpr);
+}
+
+void test_timing_reg(void **state)
+{
+	int fd = light_sensor_setup();
+	int a = 5;
+	uint8_t wpr = write_timing_reg(fd, a);
+	uint8_t status =read_timing_reg(fd);	
+	assert_int_equal(status, wpr);
+}
+
+void test_int_control_reg(void **state)
+{
+	int fd = light_sensor_setup();
+	uint8_t a = 5;
+	uint8_t wpr = write_int_control_reg(fd, a);
+	uint8_t status =read_int_control_reg(fd);	
+	assert_int_equal(status, wpr);
+}
+
+/*void test_interrupt_threshold_reg(void **state)
+{
+	int fd = light_sensor_setup();
+	uint8_t a = 5;
+	uint8_t wpr = write_interrupt_threshold_reg(fd, &a);
+	uint8_t status = read_interrupt_threshold_reg(fd, &a);	
+	assert_int_equal(status, wpr);
+}*/
+
+void test_flux_value(void **state)
+{
+	int fd = light_sensor_setup();
+	float lux = get_lux_value(fd);	
+	int status;
+	if (lux < -150 && lux> 1500)
+	{	
+		status = 1;
+	}
+	else status = 0;
+	assert_int_not_equal(status, 1);
+}
+
+void test_id_reg(void **state)
+{
+	int fd = light_sensor_setup();
+	int a = 7;
+	uint8_t wpr = write_id_reg(fd, a);
+	uint8_t status =read_id_reg(fd);	
+	assert_int_equal(status, wpr);
+}
+
+int main(int argc, char **argv)
+{
+  const struct CMUnitTest tests[] = 
+  {	
+	cmocka_unit_test(test_light_init),
+	cmocka_unit_test(test_control_reg),
+	cmocka_unit_test(test_timing_reg),
+	cmocka_unit_test(test_int_control_reg),
+	//cmocka_unit_test(test_interrupt_threshold_reg),
+	cmocka_unit_test(test_flux_value),
+	cmocka_unit_test(test_id_reg),
+
+  };
+
+  return cmocka_run_group_tests(tests, NULL, NULL);
+}
+// light task
+/*
+@file - light_task.c
+@brief - Includes all the functions for writing and reading various APDS-9301 registers
+@author - Nikhil Divekar & Vipraja Patil
+*/
+
+#include "light_task.h"
+#include "logger_task.h"
+
+uint8_t light_sensor_setup()
+{
+	char filename[20] = "/dev/i2c-2";
+	int file;
+	file = open(filename, O_RDWR);
+	if (file < 0) 
+	{
+		perror("Error in file opening");
+		exit(-1);
+	}
+	int slave_addr = 0x39;
+
+	if (ioctl(file, I2C_SLAVE, slave_addr) < 0) 
+	{
+		perror("Ioctl error");
+		exit(-1);
+	}
+	return file;	
+}
+
+uint8_t write_command_register(int fd)
+{
+	uint8_t data;
+	data = command_start;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+}
+	
+uint8_t read_control_reg(int fd)
+{
+	uint8_t data;
+	data = command_start | control_reg;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	return data;
+}
+
+uint8_t write_control_reg(int fd, uint8_t write_val)
+{
+	uint8_t data;
+	data = command_start | control_reg;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	data = write_val;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	return data;
+}
+
+uint8_t read_timing_reg(int fd)
+{
+	uint8_t data;
+	data = command_start | timing_reg;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	return data;
+}
+
+uint8_t write_timing_reg(int fd, uint8_t write_val)
+{
+	uint8_t data;
+	data = command_start | timing_reg;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	data = write_val;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	return data;
+}
+
+uint8_t write_int_control_reg(int fd, uint8_t write_val)
+{
+	uint8_t data;
+	data = command_start | interrupt_reg;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	data = write_val;
+	if(read(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	return data;
+}
+
+uint8_t read_id_reg(int fd)
+{
+	uint8_t data;
+	data = command_start | id_reg;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	return data;
+}
+
+uint8_t * read_interrupt_threshold_reg(int fd, uint8_t * read_buffer)
+{
+	uint8_t data;
+	data = command_start | th_low_low;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	read_buffer[0] = data;
+
+	data = command_start | th_low_high;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	read_buffer[1] = data;
+	
+	data = command_start | th_high_low;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	read_buffer[2] = data;
+
+	data = command_start | th_high_high;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	read_buffer[3] = data;
+
+	return read_buffer;
+}
+
+uint8_t * write_interrupt_threshold_reg(int fd, uint8_t * write_buffer)
+{
+	uint8_t data;
+	data = command_start | th_low_low;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	data = write_buffer[0];
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+
+	data = command_start | th_low_high;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	data = write_buffer[1];
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	
+	data = command_start | th_high_low;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	data = write_buffer[2];
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+
+	data = command_start | th_high_high;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	data = write_buffer[3];
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	return write_buffer;
+}
+
+uint16_t read_data0_reg(int fd)
+{
+	uint16_t data_lsb, data_msb, final_data0;
+	uint8_t addr;
+	addr = command_start | data0_low_reg;
+	if(write(fd, &addr, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data_lsb, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+
+	addr = command_start | data0_high_reg;
+	if(write(fd, &addr, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data_msb, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	data_msb = data_msb << 8;
+	
+	final_data0 = data_msb | data_lsb;
+
+	return final_data0;
+}
+
+uint16_t read_data1_reg(int fd)
+{
+	uint16_t data_lsb, data_msb, final_data1;
+	uint8_t addr;
+	addr = command_start | data1_low_reg;
+	if(write(fd, &addr, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data_lsb, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+
+	addr = command_start | data1_high_reg;
+	if(write(fd, &addr, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data_msb, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	data_msb = data_msb << 8;
+	
+	final_data1 = data_msb | data_lsb;
+
+	return final_data1;
+}
+
+float get_lux_value(int fd)
+{
+	float lux_value = 0;
+	uint8_t check;
+	check = light_sensor_setup();
+	if(check < 0)
+	{
+		perror("Sensor not set up");
+	}
+	write_control_reg(fd, 0x03);
+	write_timing_reg(fd, 0x12);
+	usleep(500);
+	
+	float data0_op, data1_op;
+	data0_op = (float)read_data0_reg(fd);
+	data1_op = (float)read_data1_reg(fd);
+
+	float adc_count;
+	
+	if(data0_op == 0 || data1_op == 0)
+	{
+		adc_count = 0;
+	}
+	adc_count = data1_op/data0_op;
+	
+	if(0 < adc_count < 0.50)
+	{
+		lux_value = (0.0304 * data0_op) - (0.062 * data0_op * powf(adc_count, 1.4));
+	}
+	else if(0.50 < adc_count < 0.61)
+	{
+		lux_value = (0.0224 * data0_op) - (0.031 * data1_op);
+	}
+	else if(0.61 < adc_count < 0.80)
+	{
+		lux_value = (0.0128 * data0_op) - (0.0153 * data1_op);
+	}
+	else if(0.80 < adc_count < 1.30)
+	{
+		lux_value = (0.00146 * data0_op) - (0.00112 * data1_op);
+	}
+	else
+	{
+		lux_value = 0;
+	}
+	return lux_value;
+}
+
+int is_it_day_or_night()
+{
+	int fd = light_sensor_setup();
+	float lux = get_lux_value(fd);
+	if(lux < 100)
+	{
+		return Night;
+	}
+	else
+	{
+		return Day;
+	}
+}
+
+	
+	
+
+
+
+#include <stdio.h>
+#include <stdlib.h>
+//#include "userled.h"
+
+void userLED(int LED_number, int on_off)
+{
+	FILE* fd;
+	if (LED_number > 3 && LED_number < 0)
+	{
+		printf("Invalid led number");
+		exit(-1);
+	}
+
+	if (on_off != 0 && on_off != 1)
+	{
+		printf("Input should be either 0 or 1");
+	}
+	switch(LED_number)
+	{
+		case 1:
+			fd = fopen("/sys/devices/platform/leds/leds/beaglebone:green:usr0/brightness", "w");
+			fprintf(fd,"%i",on_off);
+			break;
+		case 2:
+			fd = fopen("/sys/devices/platform/leds/leds/beaglebone:green:usr1/brightness", "w");
+			fprintf(fd,"%i",on_off);
+			break;
+		case 3:
+			fd = fopen("/sys/devices/platform/leds/leds/beaglebone:green:usr2/brightness", "w");
+			fprintf(fd,"%i",on_off);
+			break;
+	}
+	fclose(fd);
+}
