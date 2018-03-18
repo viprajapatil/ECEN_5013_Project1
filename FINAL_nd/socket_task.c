@@ -60,8 +60,9 @@ void socket_server()
         		printf("ERROR opening message queue\n");
 	
 		temp.tempval = 0;
-		temp.t = 7;
+		//temp.t = 7;
 		temp.log_source_id = Socket_task;
+		temp.level = 0;
 		char* buffptr = (char*)(&temp);
 	
 		if (mq_send (logger, buffptr, sizeof(temp_data), 0) == -1)
@@ -145,7 +146,7 @@ void socket_server()
 		}
 		printf("Data sent back");
 	}
-	if(incoming == 5)
+	else if(incoming == 5)
 	{
 		//call get_light_task
 		printf("Light task called \n");
