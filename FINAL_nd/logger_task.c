@@ -11,7 +11,7 @@ void loggerFN()
 {  
     	struct mq_attr attr;
 	mqd_t logger;   // queue descriptors 
-	//FILE *fptr = fopen("projectlog.log","w");	
+	FILE *fptr = fopen("projectlog.log","w");
 
 	while(1)
 	{
@@ -24,10 +24,10 @@ void loggerFN()
 	
 	//message *ptr;
     	temp_data temp;
-	 char buff[sizeof(temp_data)] = {0};
+	char buff[sizeof(temp_data)] = {0};
 
     	attr.mq_maxmsg = MAX_MESSAGES;
-   	attr.mq_msgsize = sizeof(temp_data);
+   	attr.mq_msgsize = sizeof(temp_data)+10;
     
 	pthread_mutex_lock(&pmutex);
 	logger = mq_open (SERVER_QUEUE_NAME, O_RDWR | O_CREAT, QUEUE_PERMISSIONS, &attr);
@@ -41,27 +41,22 @@ void loggerFN()
 	
 	temp_data* ptr;
 	ptr = (temp_data*)(buff);
-	char message[1024];
+	char message[1024];	
+	
 	if(ptr -> log_source_id == 1)
 		strcpy(message, "Temperature recorded");
 	if(ptr -> log_source_id == 0)
 		strcpy(message, "Light lux recorded");
 	if(ptr -> log_source_id == 3)
 		strcpy(message, "External service requested data");
-	if(ptr -> log_source_id == 2 && ptr -> t == 0)
+	if(ptr -> log_source_id == 2 && ptr -> level == 0)
 		strcpy(message, "Initializing main task");
-	if(ptr -> log_source_id == 2 && ptr -> t == 1)
-		strcpy(message, "Light thread created");
-	if(ptr -> log_source_id == 2 && ptr -> t == 2)
-		strcpy(message, "Temp thread created");
-	if(ptr -> log_source_id == 2 && ptr -> t == 3)
-		strcpy(message, "Logger thread created");
-	if(ptr -> log_source_id == 2 && ptr -> t == 5)
-		strcpy(message, "Socket thread created");
-	if(ptr -> log_source_id == 2 && ptr -> t == 4)
+	if(ptr -> log_source_id == 2 && ptr -> level == 3)
+		strcpy(message, "Threads created");
+	if(ptr -> log_source_id == 2 && ptr -> level == 2)
 		strcpy(message, "Terminating process");
 	
-    	fprintf(fptr,"Data: %f, Message: %s, Log Source: %d\n", ptr->tempval, message, ptr->log_source_id);
+    	fprintf(fptr,"Data: %f, Log Source: %d Log level: %d Message:%s\n", ptr->tempval, ptr->log_source_id, ptr-> level, message);
 	//printf("In logger received: %f", ptr -> tempval); 
 
 	fclose(fptr);
