@@ -32,7 +32,7 @@
 uint8_t light_sensor_setup();
 
 uint8_t write_command_register(int fd);
-uint8_t read_command_register(int fd)
+uint8_t read_command_register(int fd);
 
 uint8_t read_control_reg(int fd);
 
