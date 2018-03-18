@@ -28,17 +28,20 @@
 #define MSG_BUFFER_SIZE MAX_MSG_SIZE + 10
 
 typedef struct {
+	int level;
 	float tempval;
-	float t;
+	//float t;
 	int log_source_id;
+	
 }temp_data;
 
-/*typedef enum
+typedef enum
 {
 	Info,
 	Data,
-	Error
-}level_id;*/
+	Error,
+	thread_create
+}level_id;
 
 typedef enum
 {
