@@ -5,7 +5,7 @@
 #include <cmocka.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "temp.h"
+#include "temp_task.h"
 
 void test_temp_init(void **state)
 {
