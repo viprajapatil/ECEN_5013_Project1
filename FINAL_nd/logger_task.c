@@ -1,3 +1,8 @@
+/*
+@file - logger.c
+@brief - Logs data into a file
+@author - Nikhil Divekar & Vipraja Patil
+*/
 #include "logger_task.h"
 
 pthread_mutex_t pmutex;
