@@ -138,6 +138,23 @@ uint8_t write_int_control_reg(int fd, uint8_t write_val)
 	return data;
 }
 
+uint8_t read_int_control_reg(int fd)
+{
+	uint8_t data;
+	data = command_start | interrupt_reg;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	if(read(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	return data;
+}
+
 uint8_t read_id_reg(int fd)
 {
 	uint8_t data;
@@ -147,6 +164,24 @@ uint8_t read_id_reg(int fd)
 		perror("Write error");
 		exit(-1);
 	}
+	if(read(fd, &data, 1) < 0)
+	{
+		perror("Read error");
+		exit(-1);
+	}
+	return data;
+}
+
+uint8_t write_id_reg(int fd, uint8_t write_val)
+{
+	uint8_t data;
+	data = command_start | id_reg;
+	if(write(fd, &data, 1) < 0)
+	{
+		perror("Write error");
+		exit(-1);
+	}
+	data = write_val;
 	if(read(fd, &data, 1) < 0)
 	{
 		perror("Read error");
@@ -430,6 +465,3 @@ float get_lux_value(int fd)
 //}
 	
 	
-
-
-
