@@ -1,3 +1,9 @@
+/*
+@file - socket_task.h
+@brief - Header file for the program which accepts a socket request from another task in order to make API calls to the sensors 
+@author - Nikhil Divekar & Vipraja Patil
+*/
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/socket.h>
