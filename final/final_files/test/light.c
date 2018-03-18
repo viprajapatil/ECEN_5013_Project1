@@ -1,4 +1,9 @@
-// light task
+/*
+@file - light.c
+@brief - Includes all the functions for writing and reading various APDS-9301 registers
+@author - Nikhil Divekar & Vipraja Patil
+*/
+
 #include "light.h"
 
 uint8_t light_sensor_setup()
