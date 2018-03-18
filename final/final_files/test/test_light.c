@@ -9,7 +9,7 @@
 #include <cmocka.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "light.h"
+#include "light_task.h"
 
 
 void test_light_init(void **state)
