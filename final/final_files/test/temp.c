@@ -1,3 +1,9 @@
+/*
+@file - temp.c
+@brief - Includes all the functions for writing and reading various TMP102 registers
+@author - Nikhil Divekar & Vipraja Patil
+*/
+
 #include "temp.h"
 
 uint8_t write_pointer_reg(int fd, uint8_t reg)
