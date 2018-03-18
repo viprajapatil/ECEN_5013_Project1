@@ -1,6 +1,6 @@
 /*
-@file - light.h
-@brief - Header file of temp.c which includes all the functions for writing and reading various APDS-9301 registers
+@file - ligh_task.h
+@brief - Header file of light_task.c which includes all the functions for writing and reading various APDS-9301 registers
 @author - Nikhil Divekar & Vipraja Patil
 */
 
