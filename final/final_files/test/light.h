@@ -44,7 +44,11 @@ uint8_t write_timing_reg(int fd, uint8_t write_val);
 
 uint8_t write_int_control_reg(int fd, uint8_t write_val);
 
+uint8_t read_int_control_reg(int fd);
+
 uint8_t read_id_reg(int fd);
+
+uint8_t write_id_reg(int fd, uint8_t write_val);
 
 uint8_t * read_interrupt_threshold_reg(int fd, uint8_t * read_buffer);
 
@@ -55,9 +59,3 @@ uint16_t read_data0_reg(int fd);
 uint16_t read_data1_reg(int fd);
 
 float get_lux_value(int fd);
-
-
-
-
-
-
