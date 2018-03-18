@@ -384,32 +384,31 @@ float get_lux_value(int fd)
 	}
 	write_control_reg(fd, 0x03);
 	write_timing_reg(fd, 0x12);
-	usleep(500);
+	//usleep(500);
 	
 	float data0_op, data1_op;
 	data0_op = (float)read_data0_reg(fd);
 	data1_op = (float)read_data1_reg(fd);
 	
-	if(data0_op == 0)
+	if(data0_op == 0 || data1_op == 0)
 	{
-		perror("Error divide by zero");
-		exit(-1);
+		lux_value = 0;
 	}
 	float adc_count = data1_op/data0_op;
 	
-	if(0 < adc_count < 0.50)
+	if(0 < adc_count && adc_count < 0.50)
 	{
 		lux_value = (0.0304 * data0_op) - (0.062 * data0_op * powf(adc_count, 1.4));
 	}
-	else if(0.50 < adc_count < 0.61)
+	else if(0.50 < adc_count && adc_count < 0.61)
 	{
 		lux_value = (0.0224 * data0_op) - (0.031 * data1_op);
 	}
-	else if(0.61 < adc_count < 0.80)
+	else if(0.61 < adc_count && adc_count< 0.80)
 	{
 		lux_value = (0.0128 * data0_op) - (0.0153 * data1_op);
 	}
-	else if(0.80 < adc_count < 1.30)
+	else if(0.80 < adc_count && adc_count < 1.30)
 	{
 		lux_value = (0.00146 * data0_op) - (0.00112 * data1_op);
 	}
@@ -420,48 +419,5 @@ float get_lux_value(int fd)
 	return lux_value;
 }
 
-
-/*void main()
-{
-	//float data;
-	int fd = light_sensor_setup();
-	//write_control_reg(fd, 0x1);
-	/*uint8_t data;
-	data = command_start | control_reg;
-	if(write(fd, &data, 1) < 0)
-	{
-		perror("Write error");
-		exit(-1);
-	}
-	data = 5;
-	if(write(fd, &data, 1) < 0)
-	{
-		perror("Write error");
-		exit(-1);
-	}*/	
-	//data = read_control_reg(fd);
-
-	//uint8_t data;
-	/*data = command_start | control_reg;
-	if(write(fd, &data, 1) < 0)
-	{
-		perror("Write error");
-		exit(-1);
-	}
-	if(read(fd, &data, 1) < 0)
-	{
-		perror("Read error");
-		exit(-1);
-	}*/
-	//get_lux_value(fd);
-	/*float lux;
-	lux = get_lux_value(fd);
-	printf("%f", lux);
-	/*uint8_t value = 4;
-	value = write_timing_reg(fd, value);
-	value = read_timing_reg(fd);
-	printf("%d", value);*/
-	
-//}
 	
 	
